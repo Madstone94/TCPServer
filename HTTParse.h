@@ -1,51 +1,67 @@
-#ifndef HTTPThreader_H_
-#define HTTPThreader_H_
-#include <getopt.h>
+#ifndef HTTParse_H_
+#define HTTParse_H_
 #include <string.h>
+#include <fcntl.h>
 #include <stdbool.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <pthread.h>
-#include "Parameters.h"
-#include <unistd.h>
+#include <stdint.h> // read writer
+#include <math.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <assert.h>
+#include "HTTPThreader.h"
 
-//static so its not visible outside this file
-static pthread_cond_t recieved = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+#define BUFFER_SIZE 4096
 
-// from kent state example, superior to my version
-typedef struct client {
-    ssize_t fd;
-    // needed struct to work
-    struct client* next;
-}client;
-
-typedef struct dispatchObj {
-    // waitlist
-    int* waiting;
-    client* waitlist;
-    client* newest;
+// exists because single file was too cumbersome
+// easier than passing a bunch of variables
+typedef struct commObj{
+	char* request;
+	char* filename;
+	char* cversion;
+    char* version;
+    // makes things faster
+    bool check;
+    bool validver;
+    int length;
+    char* body;
+    // bytes read might be deprecated
+    int bytes;
     // logging
     bool log;
     char* logname;
-    char* version;
-    // used to identify threads
-    int* current;
-    int threadcount;
-    pthread_t* threads;
-}Dispatch;
+    // for logging 
+    int temp;
+}Command;
 
-typedef struct Thread {
-    int id;
-    Dispatch dispatcher;
-}Thread;
-
-// constructor
-Dispatch newdispatch(Parameters params);
-Thread* passthread(const int id, Dispatch dispatcher);
-void init(Dispatch dispatcher);
-// thread processes
-void* run(void* data);
-client* popclient(Dispatch* dispatcher);
-void addclient(Dispatch dispatcher,ssize_t client_socket);
+//constructor
+Command* parserequest(char* orig, char* clean, Dispatch* dispatcher,int bytes);
+//parsing
+//void accumulator(ssize_t client_socket,Dispatch* dispatcher);
+char* cleancommand(char command[]);
+char* removesugar(char command[], const char substring[],char replace[]);
+//order parsing
+Command* parseheader(char* header, Dispatch* dispatcher,int bytes);
+char* getplace(char* command,const int place);
+int getlength(char* command);
+char* getbody(char* command);
+//misc
+bool validatefile(char* file);
+bool isnumeric(char* number);
+int checkfile(char* file, int mode);
+int accesschecker();
+int filesize(char* file);
+off_t offsetsize(char* file);
+void calculate(const int tempfd, char* header, Dispatch* dispatcher, off_t size);
+off_t transform(int fd, unsigned char* buffer,int read, off_t offset);
+//execute
+void execute(Command* order, ssize_t client_socket, Dispatch* dispatcher);
+int exehead(Command* order);
+int exeget(Command* order);
+int exeput(Command* order);
+// IO
+void writelog(int mode, Command* order, Dispatch* dispatcher);
+void codewriter(ssize_t client_socket, Command* order, int code, Dispatch* dispatcher);
+void errorwriter(Command* order, ssize_t client_socket, Dispatch* dispatcher);
 #endif

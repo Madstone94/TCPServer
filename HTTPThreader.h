@@ -8,10 +8,7 @@
 #include <pthread.h>
 #include "Parameters.h"
 #include <unistd.h>
-
-//static so its not visible outside this file
-static pthread_cond_t recieved = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+#include <stdatomic.h>
 
 // from kent state example, superior to my version
 typedef struct client {
@@ -22,17 +19,21 @@ typedef struct client {
 
 typedef struct dispatchObj {
     // waitlist
-    int* waiting;
+    atomic_int* entries;
+    atomic_int* fails;
+    atomic_int* waiting;
     client* waitlist;
     client* newest;
     // logging
     bool log;
+    int fd;
+    off_t* offset;
     char* logname;
     char* version;
     // used to identify threads
     int* current;
     int threadcount;
-    pthread_t* threads;
+    pthread_t threads[];
 }Dispatch;
 
 typedef struct Thread {
@@ -40,12 +41,9 @@ typedef struct Thread {
     Dispatch dispatcher;
 }Thread;
 
-// constructor
-Dispatch newdispatch(Parameters params);
-Thread* passthread(const int id, Dispatch dispatcher);
-void init(Dispatch dispatcher);
+void init(Dispatch* dispatcher);
 // thread processes
 void* run(void* data);
 client* popclient(Dispatch* dispatcher);
-void addclient(Dispatch dispatcher,ssize_t client_socket);
+void addclient(Dispatch* dispatcher,ssize_t client_socket);
 #endif

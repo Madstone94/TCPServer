@@ -13,13 +13,13 @@
 
 #include "Parameters.h"
 #include "HTTPThreader.h"
+#include "HTTParse.h"
 
 // prototypes
 // SERVER FUNCTIONS - DO NOT TOUCH
 void create_server(Parameters params);
 void create_socket(struct sockaddr_in server_address, socklen_t addresslength, Parameters params);
-void connectclient(int server_socket, Parameters params);
-void accumulator(ssize_t client_socket, Parameters params);
+void connectclient(ssize_t server_socket, Parameters params);
 
 #define BUFFER_SIZE 4096
 
@@ -55,6 +55,9 @@ void create_socket(struct sockaddr_in server_address, socklen_t addresslength, P
     int enable = 1;
     int ret = setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
     ret = bind(server_socket, (struct sockaddr *) &server_address, addresslength);
+    if (ret < 0) {
+        exit(EXIT_FAILURE);
+    }
     ret = listen(server_socket, 5); // 5 should be enough, if not use SOMAXCONN
     if (ret < 0) {
         exit(EXIT_FAILURE);
@@ -62,14 +65,35 @@ void create_socket(struct sockaddr_in server_address, socklen_t addresslength, P
 	connectclient(server_socket,params);
 }
 
-void connectclient(int server_socket, Parameters params) {
-    Dispatch dispatcher = newdispatch(params);
+void connectclient(ssize_t server_socket, const Parameters params) {
+    Dispatch* dispatcher = malloc(sizeof(Dispatch) + (params.threads * sizeof(pthread_t)));
+    dispatcher->threadcount = params.threads;
+    dispatcher->log = params.log;
+    dispatcher->logname = params.logname;
+    dispatcher->version = params.version;
+    static atomic_int wait = 0;
+    dispatcher->waiting = &wait;
+    static int current = 0;
+    dispatcher->current = &current;
+    static atomic_int entries = 0;
+    dispatcher->entries = &entries;
+    static atomic_int fails = 0;
+    dispatcher->fails = &fails;
+    static off_t offset = 0;
+    dispatcher->offset = &offset;
     init(dispatcher);
-    printf("[+] server is waiting...\n");
+    if (dispatcher->log == true) {
+        dispatcher->fd = open(dispatcher->logname, O_CREAT | O_TRUNC | O_RDWR | O_APPEND,0644);
+    }
     while (1) {
+        printf("[+] server is waiting...\n");
         struct sockaddr client_address;
-        socklen_t client_addresslength;
+        socklen_t client_addresslength = sizeof(client_address);
         ssize_t client_socket = accept(server_socket, &client_address, &client_addresslength);
-        close(client_socket);
+        printf("NEW CLIENT: %ld\n",client_socket);
+        printf("ERROR: %d\n",errno);
+        addclient(dispatcher,client_socket);
+        (*dispatcher->entries)++;
+        printf("total requests accepted: %d\n",(*dispatcher->entries));
     }
 }

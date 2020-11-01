@@ -66,7 +66,7 @@ char* findport(int argc,char**argv) {
 }
 
 bool checknumber(char* number) {
-    const bool debug = true;
+    const bool debug = false;
     if (debug == true) {
         printf("Value: ");
     }
@@ -84,7 +84,7 @@ bool checknumber(char* number) {
 }
 
 bool isflag(char* argument) {
-    const bool debug = true;
+    const bool debug = false;
     if (debug == true) {
         printf("flag: ");
     }
